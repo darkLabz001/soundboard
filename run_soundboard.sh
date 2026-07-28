@@ -1,20 +1,25 @@
 #!/bin/bash
-# Soundboard launcher script
+# Simple soundboard launcher - NO VENV!
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-VENV_DIR="$SCRIPT_DIR/soundboard_venv"
+echo "🎵 Music Soundboard"
+echo "===================="
+echo ""
+echo "📥 Installing dependencies..."
+python3 -m pip install --break-system-packages -q pygame PyQt6 2>/dev/null
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "$VENV_DIR" ]; then
-    echo "🎵 Setting up soundboard environment..."
-    python3 -m venv "$VENV_DIR"
-    source "$VENV_DIR/bin/activate"
-    pip install -q PyQt6 numpy pyaudio
-    echo "✓ Environment ready!"
+if [ $? -eq 0 ]; then
+    echo "✓ Ready!"
 else
-    source "$VENV_DIR/bin/activate"
+    echo "⚠️ Trying user install..."
+    python3 -m pip install --user -q pygame PyQt6 2>/dev/null
 fi
 
-# Run the soundboard
-echo "🎹 Starting Music Soundboard..."
-python3 "$SCRIPT_DIR/soundboard_app.py"
+echo ""
+echo "🎹 Starting Soundboard..."
+echo "===================="
+echo "📍 Keys: Q W E R / A S D F / Z X C V / 1 2 3 4"
+echo "🎙️ Click RED button to record"
+echo "📁 Recordings saved as WAV files"
+echo ""
+
+python3 "$(dirname "$0")/soundboard_simple.py"
