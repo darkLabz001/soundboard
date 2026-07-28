@@ -1,363 +1,436 @@
 #!/usr/bin/env python3
 """
-Music Soundboard - Simple version with no dependencies!
-Uses pygame for audio (easier to install than PyAudio)
+Professional Music Soundboard - with 30+ sounds and modern UI
 """
 
 import sys
 import math
 import struct
-from collections import defaultdict
+import random
 from datetime import datetime
-import threading
 import wave
 
-# Try to import pygame
 try:
     import pygame
     pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=512)
-    HAS_PYGAME = True
 except ImportError:
-    print("📥 Installing pygame (first time only)...")
     import subprocess
     subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "--break-system-packages", "pygame"])
     import pygame
     pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=512)
-    HAS_PYGAME = True
 
-# Try to import PyQt6
 try:
-    from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QGridLayout,
-                                 QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFileDialog,
-                                 QSpinBox, QSlider, QComboBox, QCheckBox, QMessageBox)
-    from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
-    from PyQt6.QtGui import QFont, QColor, QKeyEvent
+    from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QGridLayout, QWidget,
+                                 QLabel, QVBoxLayout, QHBoxLayout, QGroupBox, QSlider, QMessageBox)
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QFont, QColor
 except ImportError:
-    print("📥 Installing PyQt6 (first time only)...")
     import subprocess
     subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "--break-system-packages", "PyQt6"])
-    from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QGridLayout,
-                                 QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFileDialog,
-                                 QSpinBox, QSlider, QComboBox, QCheckBox, QMessageBox)
-    from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
-    from PyQt6.QtGui import QFont, QColor, QKeyEvent
+    from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QGridLayout, QWidget,
+                                 QLabel, QVBoxLayout, QHBoxLayout, QGroupBox, QSlider, QMessageBox)
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QFont, QColor
 
-class AudioSynthesizer:
-    """Simple audio synthesizer using pygame mixer"""
+class ProSynthesizer:
+    """Professional synthesizer with 30+ sounds"""
 
     def __init__(self):
-        self.sample_rate = 44100
-        self.volume = 0.7
-        self.waveform = 'sine'
-        self.is_recording = False
-        self.recording_buffer = []
+        self.sr = 44100
+        self.vol = 0.7
+        self.rec_buf = []
+        self.is_rec = False
 
-    def generate_sound(self, frequency, duration=0.5, waveform='sine'):
-        """Generate a sound wave and return as pygame Sound"""
-        num_samples = int(self.sample_rate * duration)
+    # DRUMS
+    def kick_808(self):
+        return self.drum(150, 50, 0.5, 0.08)
 
-        # Generate samples using math (no numpy needed!)
+    def kick_deep(self):
+        return self.drum(100, 40, 0.6, 0.1)
+
+    def snare_crisp(self):
+        return self.perc(0.2, 2000, 0.15, 0.05)
+
+    def snare_fat(self):
+        return self.perc(0.25, 1500, 0.25, 0.08)
+
+    def hihat_closed(self):
+        return self.hihat(0.08)
+
+    def hihat_open(self):
+        return self.hihat(0.3)
+
+    def clap(self):
         samples = []
-        for i in range(num_samples):
-            t = i / self.sample_rate
+        for i in range(int(self.sr * 0.15)):
+            t = i / self.sr
+            noise = random.uniform(-1, 1)
+            env = 0
+            for ht in [0, 0.04]:
+                if abs(t - ht) < 0.03:
+                    env += math.exp(-abs(t - ht) / 0.02)
+            env *= (1 - t / 0.15)
+            samples.append(int(noise * env * 0.8 * 32767 * self.vol))
+        return self.pack(samples)
 
-            if waveform == 'sine':
-                sample = math.sin(2 * math.pi * frequency * t)
-            elif waveform == 'square':
-                val = math.sin(2 * math.pi * frequency * t)
-                sample = 1.0 if val > 0 else -1.0
-            elif waveform == 'triangle':
-                val = 2 * (t * frequency - math.floor(t * frequency + 0.5))
-                sample = 2 * abs(val) - 1
-            elif waveform == 'sawtooth':
-                sample = 2 * (t * frequency - math.floor(t * frequency + 0.5))
+    def tom_high(self):
+        return self.tom(400, 0.15)
+
+    def tom_mid(self):
+        return self.tom(250, 0.15)
+
+    def tom_low(self):
+        return self.tom(150, 0.2)
+
+    def cowbell(self):
+        samples = []
+        for i in range(int(self.sr * 0.2)):
+            t = i / self.sr
+            sample = math.sin(2 * math.pi * 540 * t) * math.exp(-t / 0.2)
+            sample += math.sin(2 * math.pi * 540 * 1.5 * t) * 0.5 * math.exp(-t / 0.2)
+            samples.append(int(sample * 32767 * self.vol))
+        return self.pack(samples)
+
+    # SYNTHS
+    def bass_deep(self, freq):
+        return self.synth(freq, 0.6, 'sine')
+
+    def bass_fat(self, freq):
+        return self.synth(freq, 0.8, 'square')
+
+    def bass_sub(self, freq):
+        return self.synth(freq * 0.5, 0.7, 'sine')
+
+    def lead_bright(self, freq):
+        return self.lead(freq, 'square')
+
+    def lead_warm(self, freq):
+        return self.lead(freq, 'sine')
+
+    def lead_aggressive(self, freq):
+        return self.lead(freq, 'sawtooth')
+
+    def pad_lush(self, freq):
+        return self.pad(freq, 1.0, 0.3)
+
+    def pad_ethereal(self, freq):
+        return self.pad(freq, 1.2, 0.5)
+
+    def pad_dark(self, freq):
+        return self.pad(freq, 0.8, 0.2)
+
+    def pluck(self, freq):
+        samples = []
+        for i in range(int(self.sr * 0.4)):
+            t = i / self.sr
+            sample = math.sin(2 * math.pi * freq * t) * math.exp(-t * 8)
+            samples.append(int(sample * 0.7 * 32767 * self.vol))
+        return self.pack(samples)
+
+    # SYNTH ENGINES
+    def drum(self, f_start, f_end, dur, decay):
+        samples = []
+        for i in range(int(self.sr * dur)):
+            t = i / self.sr
+            freq = f_end + (f_start - f_end) * math.exp(-t / decay)
+            amp = math.exp(-t / decay)
+            sample = math.sin(2 * math.pi * freq * t) * amp
+            sample += 0.2 * math.sin(2 * math.pi * freq * 2 * t) * amp
+            samples.append(int(sample * 0.9 * 32767 * self.vol))
+        return self.pack(samples)
+
+    def perc(self, dur, freq, att, dec):
+        samples = []
+        for i in range(int(self.sr * dur)):
+            t = i / self.sr
+            noise = random.uniform(-1, 1)
+            env = math.exp(-max(0, t - att) / dec) if t > att else (t / att)
+            pitch = math.sin(2 * math.pi * freq * t) * 0.5
+            sample = (noise * 0.7 + pitch * 0.3) * env
+            samples.append(int(sample * 32767 * self.vol))
+        return self.pack(samples)
+
+    def hihat(self, dur):
+        samples = []
+        for i in range(int(self.sr * dur)):
+            t = i / self.sr
+            noise = random.uniform(-1, 1)
+            env = math.exp(-t / (0.08 if dur < 0.1 else 0.2))
+            sample = noise * env * (1 - math.exp(-t * 20))
+            samples.append(int(sample * 0.6 * 32767 * self.vol))
+        return self.pack(samples)
+
+    def tom(self, freq, dur):
+        samples = []
+        for i in range(int(self.sr * dur)):
+            t = i / self.sr
+            pitch = freq + freq * 2 * math.exp(-t * 20)
+            env = math.exp(-t / 0.1)
+            sample = math.sin(2 * math.pi * pitch * t) * env
+            samples.append(int(sample * 0.7 * 32767 * self.vol))
+        return self.pack(samples)
+
+    def synth(self, freq, dur, wave_type):
+        samples = []
+        for i in range(int(self.sr * dur)):
+            t = i / self.sr
+            if wave_type == 'sine':
+                wave = math.sin(2 * math.pi * freq * t)
+            elif wave_type == 'square':
+                wave = 1 if math.sin(2 * math.pi * freq * t) > 0 else -1
             else:
-                sample = math.sin(2 * math.pi * frequency * t)
+                wave = 2 * (t * freq - math.floor(t * freq + 0.5))
 
-            # ADSR Envelope
-            if i < int(0.01 * self.sample_rate):  # Attack
-                envelope = i / int(0.01 * self.sample_rate)
-            elif i < int(0.1 * self.sample_rate):  # Decay
-                envelope = 1.0 - (i - int(0.01 * self.sample_rate)) / int(0.09 * self.sample_rate) * 0.3
-            elif i < int(0.3 * self.sample_rate):  # Sustain
-                envelope = 0.7
-            else:  # Release
-                remaining = num_samples - i
-                release_time = int(0.2 * self.sample_rate)
-                if remaining > 0:
-                    envelope = 0.7 * remaining / release_time
-                else:
-                    envelope = 0
+            wave += math.sin(2 * math.pi * freq * 2 * t) * 0.2
 
-            samples.append(int(sample * envelope * 0.8 * 32767 * self.volume))
+            if t < 0.05:
+                env = t / 0.05
+            else:
+                env = max(0, 0.8 - (t - 0.05) * 0.5)
 
-        # Convert to 16-bit bytes using struct
-        sound_bytes = b''.join(struct.pack('<h', max(-32768, min(32767, s))) for s in samples)
+            sample = wave * env * 0.6
+            samples.append(int(sample * 32767 * self.vol))
+        return self.pack(samples)
 
-        # Create pygame Sound
-        sound = pygame.mixer.Sound(buffer=sound_bytes)
+    def lead(self, freq, wave_type):
+        samples = []
+        for i in range(int(self.sr * 0.5)):
+            t = i / self.sr
+            if wave_type == 'sine':
+                wave = math.sin(2 * math.pi * freq * t)
+            elif wave_type == 'square':
+                wave = 1 if math.sin(2 * math.pi * freq * t) > 0 else -1
+            else:
+                wave = 2 * (t * freq - math.floor(t * freq + 0.5))
 
-        # Record if enabled
-        if self.is_recording:
-            self.recording_buffer.extend(samples)
+            if t < 0.01:
+                env = t / 0.01
+            else:
+                env = max(0, 0.9 - (t - 0.01) * 1.5)
 
-        return sound
+            sample = wave * env * 0.5
+            samples.append(int(sample * 32767 * self.vol))
+        return self.pack(samples)
+
+    def pad(self, freq, dur, att):
+        samples = []
+        for i in range(int(self.sr * dur)):
+            t = i / self.sr
+            wave = math.sin(2 * math.pi * freq * t) * 0.5
+            wave += math.sin(2 * math.pi * freq * 1.5 * t) * 0.3
+            wave += math.sin(2 * math.pi * freq * 0.7 * t) * 0.2
+
+            if t < att:
+                env = (t / att) ** 0.5
+            else:
+                env = 0.8
+
+            sample = wave * env * 0.4
+            samples.append(int(sample * 32767 * self.vol))
+        return self.pack(samples)
+
+    def pack(self, samples):
+        return b''.join(struct.pack('<h', max(-32768, min(32767, s))) for s in samples)
 
     def start_recording(self):
-        """Start recording audio"""
-        self.is_recording = True
-        self.recording_buffer = []
+        self.is_rec = True
+        self.rec_buf = []
 
     def stop_recording(self):
-        """Stop recording and save to file"""
-        self.is_recording = False
-        if self.recording_buffer:
-            return self.save_recording()
+        self.is_rec = False
+        if self.rec_buf:
+            fname = f"recording_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
+            rec_bytes = b''.join(struct.pack('<h', max(-32768, min(32767, s))) for s in self.rec_buf)
+            try:
+                with wave.open(fname, 'wb') as f:
+                    f.setnchannels(1)
+                    f.setsampwidth(2)
+                    f.setframerate(self.sr)
+                    f.writeframes(rec_bytes)
+                return fname
+            except:
+                return None
         return None
 
-    def save_recording(self):
-        """Save recording to WAV file"""
-        if not self.recording_buffer:
-            return None
-
-        # Convert to 16-bit bytes using struct
-        recording_bytes = b''.join(struct.pack('<h', max(-32768, min(32767, s))) for s in self.recording_buffer)
-
-        # Generate filename
-        filename = f"recording_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
-
-        # Save WAV file
-        try:
-            with wave.open(filename, 'wb') as wav_file:
-                wav_file.setnchannels(1)
-                wav_file.setsampwidth(2)
-                wav_file.setframerate(self.sample_rate)
-                wav_file.writeframes(recording_bytes)
-
-            print(f"✓ Recording saved: {filename}")
-            return filename
-        except Exception as e:
-            print(f"Error saving recording: {e}")
-            return None
-
-class SoundboardApp(QMainWindow):
-    """Main soundboard application"""
-
-    KEY_MAP = {
-        Qt.Key.Key_Q: (0, 0), Qt.Key.Key_W: (0, 1), Qt.Key.Key_E: (0, 2), Qt.Key.Key_R: (0, 3),
-        Qt.Key.Key_A: (1, 0), Qt.Key.Key_S: (1, 1), Qt.Key.Key_D: (1, 2), Qt.Key.Key_F: (1, 3),
-        Qt.Key.Key_Z: (2, 0), Qt.Key.Key_X: (2, 1), Qt.Key.Key_C: (2, 2), Qt.Key.Key_V: (2, 3),
-        Qt.Key.Key_1: (3, 0), Qt.Key.Key_2: (3, 1), Qt.Key.Key_3: (3, 2), Qt.Key.Key_4: (3, 3),
-    }
+class ProSoundboardApp(QMainWindow):
+    """Professional music production soundboard"""
 
     def __init__(self):
         super().__init__()
-        self.synth = AudioSynthesizer()
-        self.buttons = {}
-        self.sound_colors = {}
+        self.synth = ProSynthesizer()
         self.recording = False
-        self.sounds = {}
         self.init_ui()
 
     def init_ui(self):
-        """Initialize the user interface"""
-        self.setWindowTitle("🎵 Music Soundboard - No Dependencies!")
-        self.setGeometry(100, 100, 1300, 800)
+        self.setWindowTitle("🎵 Professional Music Soundboard")
+        self.setGeometry(50, 50, 1500, 900)
+        self.setStyleSheet("""
+            QMainWindow { background-color: #0a0e27; }
+            QGroupBox { color: #fff; border: 2px solid #1e3a8a; background-color: #0f172a; }
+            QLabel { color: #e0e7ff; }
+        """)
 
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        main_layout = QHBoxLayout()
+        main = QWidget()
+        self.setCentralWidget(main)
+        layout = QHBoxLayout()
 
-        # Left side: Soundboard grid
-        left_layout = QVBoxLayout()
+        # DRUMS
+        drums_layout = QVBoxLayout()
+        drums_grp = QGroupBox("🥁 DRUMS")
+        drums_grid = QGridLayout()
 
-        title = QLabel("🎹 SOUNDBOARD")
-        title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        left_layout.addWidget(title)
-
-        instructions = QLabel("Q W E R / A S D F / Z X C V / 1 2 3 4")
-        instructions.setFont(QFont("Arial", 10))
-        instructions.setStyleSheet("color: #888;")
-        left_layout.addWidget(instructions)
-
-        grid = QGridLayout()
-        grid.setSpacing(10)
-
-        colors = [
-            QColor(255, 100, 100), QColor(255, 200, 100), QColor(255, 255, 100), QColor(100, 255, 100),
-            QColor(100, 200, 255), QColor(200, 100, 255), QColor(255, 100, 200), QColor(100, 255, 255),
-            QColor(255, 150, 100), QColor(150, 255, 100), QColor(100, 150, 255), QColor(255, 100, 150),
-            QColor(200, 255, 100), QColor(100, 255, 200), QColor(255, 200, 200), QColor(200, 200, 255),
+        drums_data = [
+            ('Kick 808', self.synth.kick_808, '#ff3333'),
+            ('Kick Deep', self.synth.kick_deep, '#ff5555'),
+            ('Snare', self.synth.snare_crisp, '#ffaa00'),
+            ('Snare Fat', self.synth.snare_fat, '#ffbb22'),
+            ('Hi-Hat Cls', self.synth.hihat_closed, '#33ff33'),
+            ('Hi-Hat Opn', self.synth.hihat_open, '#55ff55'),
+            ('Clap', self.synth.clap, '#ff8800'),
+            ('Tom High', self.synth.tom_high, '#ffff33'),
+            ('Tom Mid', self.synth.tom_mid, '#ffff55'),
+            ('Tom Low', self.synth.tom_low, '#ffff77'),
+            ('Cowbell', self.synth.cowbell, '#00ffff'),
         ]
 
-        color_idx = 0
-        for row in range(4):
-            for col in range(4):
-                btn = QPushButton(f"{row*4+col+1}")
-                btn.setMinimumSize(120, 120)
-                btn.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {colors[color_idx].name()};
-                        border: 3px solid #333;
-                        border-radius: 10px;
-                        color: white;
-                        font-weight: bold;
-                    }}
-                    QPushButton:pressed {{
-                        background-color: {colors[color_idx].darker(150).name()};
-                        border: 5px solid #000;
-                    }}
-                """)
+        for idx, (name, func, color) in enumerate(drums_data):
+            btn = self.btn(name, color, 70)
+            btn.pressed.connect(lambda f=func: self.play(f()))
+            drums_grid.addWidget(btn, idx // 4, idx % 4)
 
-                self.buttons[(row, col)] = btn
-                self.sound_colors[(row, col)] = colors[color_idx]
+        drums_grp.setLayout(drums_grid)
+        drums_layout.addWidget(drums_grp)
+        drums_layout.addStretch()
 
-                grid.addWidget(btn, row, col)
-                color_idx += 1
+        # BASS
+        bass_layout = QVBoxLayout()
+        bass_grp = QGroupBox("🎸 BASS")
+        bass_grid = QGridLayout()
 
-                # Generate default synth sound
-                note_number = row * 4 + col
-                freq = 110 * (2 ** (note_number / 12))
-                self.sounds[(row, col)] = self.synth.generate_sound(freq, 0.5, 'sine')
+        bass_types = [('Deep', self.synth.bass_deep), ('Fat', self.synth.bass_fat), ('Sub', self.synth.bass_sub)]
+        notes = [55, 82.41, 110, 146.83, 195.99, 246.94, 329.63]
+        note_names = ['A1', 'E2', 'A2', 'D3', 'B3', 'B3', 'E4']
 
-        left_layout.addLayout(grid, 1)
+        row = 0
+        for bname, bfunc in bass_types:
+            for col, (freq, note) in enumerate(zip(notes, note_names)):
+                btn = self.btn(f"{note}\n{bname}", '#0088ff', 60)
+                btn.pressed.connect(lambda f=freq, bf=bfunc: self.play(bf(f)))
+                bass_grid.addWidget(btn, row, col)
+            row += 1
 
-        # Right side: Controls
-        right_layout = QVBoxLayout()
+        bass_grp.setLayout(bass_grid)
+        bass_layout.addWidget(bass_grp)
+        bass_layout.addStretch()
 
-        # Recording section
-        right_layout.addWidget(QLabel("🎙️ RECORDING", font=QFont("Arial", 12, QFont.Weight.Bold)))
+        # LEADS
+        lead_layout = QVBoxLayout()
+        lead_grp = QGroupBox("🎹 LEADS")
+        lead_grid = QGridLayout()
 
-        self.record_btn = QPushButton("⏺️ Start Recording")
-        self.record_btn.setMinimumHeight(50)
-        self.record_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ff4444;
-                color: white;
-                font-weight: bold;
-                font-size: 14px;
-                border-radius: 8px;
-                border: 2px solid #cc0000;
-            }
-            QPushButton:hover {
-                background-color: #ff6666;
-            }
+        lead_types = [('Bright', self.synth.lead_bright), ('Warm', self.synth.lead_warm), ('Aggro', self.synth.lead_aggressive)]
+        row = 0
+        for lname, lfunc in lead_types:
+            for col, (freq, note) in enumerate(zip(notes, note_names)):
+                btn = self.btn(f"{note}\n{lname}", '#ff00ff', 60)
+                btn.pressed.connect(lambda f=freq, lf=lfunc: self.play(lf(f)))
+                lead_grid.addWidget(btn, row, col)
+            row += 1
+
+        lead_grp.setLayout(lead_grid)
+        lead_layout.addWidget(lead_grp)
+
+        # PADS
+        pad_grp = QGroupBox("🌊 PADS")
+        pad_grid = QGridLayout()
+
+        pad_types = [('Lush', self.synth.pad_lush), ('Ethreal', self.synth.pad_ethereal), ('Dark', self.synth.pad_dark), ('Pluck', self.synth.pluck)]
+        row = 0
+        for pname, pfunc in pad_types:
+            for col, (freq, note) in enumerate(zip(notes[:4], note_names[:4])):
+                btn = self.btn(f"{note}\n{pname}", '#00ffaa', 55)
+                btn.pressed.connect(lambda f=freq, pf=pfunc: self.play(pf(f)))
+                pad_grid.addWidget(btn, row, col)
+            row += 1
+
+        pad_grp.setLayout(pad_grid)
+        lead_layout.addWidget(pad_grp)
+        lead_layout.addStretch()
+
+        # CONTROLS
+        ctrl_layout = QVBoxLayout()
+
+        rec_grp = QGroupBox("🎙️ RECORDING")
+        rec_l = QVBoxLayout()
+        self.rec_btn = self.btn("⏺️ START", '#ff4444', 50)
+        self.rec_btn.pressed.connect(self.toggle_rec)
+        rec_l.addWidget(self.rec_btn)
+        self.rec_lbl = QLabel("Ready")
+        self.rec_lbl.setStyleSheet("color: #888; font-size: 10px;")
+        rec_l.addWidget(self.rec_lbl)
+        rec_grp.setLayout(rec_l)
+        ctrl_layout.addWidget(rec_grp)
+
+        vol_grp = QGroupBox("🔊 VOLUME")
+        vol_l = QVBoxLayout()
+        vol_slider = QSlider(Qt.Orientation.Vertical)
+        vol_slider.setMinimum(0)
+        vol_slider.setMaximum(100)
+        vol_slider.setValue(70)
+        vol_slider.sliderMoved.connect(lambda v: setattr(self.synth, 'vol', v / 100))
+        vol_l.addWidget(vol_slider)
+        vol_grp.setLayout(vol_l)
+        ctrl_layout.addWidget(vol_grp)
+
+        info = QLabel("🎵 30+ SOUNDS\n\n✓ 11 Drums\n✓ 9 Bass Synths\n✓ 9 Leads\n✓ 8 Pads\n\nClick or press!")
+        info.setStyleSheet("color: #aaa; font-size: 10px;")
+        ctrl_layout.addWidget(info)
+        ctrl_layout.addStretch()
+
+        layout.addLayout(drums_layout, 1)
+        layout.addLayout(bass_layout, 1)
+        layout.addLayout(lead_layout, 1)
+        layout.addLayout(ctrl_layout, 0)
+
+        main.setLayout(layout)
+
+    def btn(self, text, color, size):
+        b = QPushButton(text)
+        b.setMinimumSize(size, size)
+        b.setFont(QFont("Arial", 7, QFont.Weight.Bold))
+        b.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {color}; color: white;
+                border: 1px solid #000; border-radius: 3px;
+            }}
+            QPushButton:pressed {{ background-color: {QColor(color).lighter(150).name()}; }}
         """)
-        self.record_btn.clicked.connect(self.toggle_recording)
-        right_layout.addWidget(self.record_btn)
+        return b
 
-        self.record_time = QLabel("Ready to record")
-        self.record_time.setStyleSheet("font-size: 14px; font-weight: bold; color: #666;")
-        right_layout.addWidget(self.record_time)
+    def play(self, audio):
+        snd = pygame.mixer.Sound(buffer=audio)
+        pygame.mixer.find_channel().play(snd)
 
-        right_layout.addWidget(QLabel(""))
+        if self.synth.is_rec:
+            samples = [int.from_bytes(audio[i:i+2], 'little', signed=True) for i in range(0, len(audio), 2)]
+            self.synth.rec_buf.extend(samples)
 
-        # Volume control
-        right_layout.addWidget(QLabel("🔊 Volume"))
-        volume_slider = QSlider(Qt.Orientation.Horizontal)
-        volume_slider.setMinimum(0)
-        volume_slider.setMaximum(100)
-        volume_slider.setValue(70)
-        volume_slider.sliderMoved.connect(lambda v: setattr(self.synth, 'volume', v / 100))
-        right_layout.addWidget(volume_slider)
-
-        # Waveform selector
-        right_layout.addWidget(QLabel("🌊 Waveform"))
-        waveform_combo = QComboBox()
-        waveform_combo.addItems(['sine', 'square', 'triangle', 'sawtooth'])
-        waveform_combo.currentTextChanged.connect(self.on_waveform_changed)
-        right_layout.addWidget(waveform_combo)
-
-        right_layout.addStretch()
-        info = QLabel(
-            "🎵 QUICK START\n\n"
-            "• Click pads or press keys\n"
-            "• Click RECORD button\n"
-            "• Make your music!\n"
-            "• Click STOP to save\n\n"
-            "✓ No dependencies!\n"
-            "✓ Just works!"
-        )
-        info.setFont(QFont("Arial", 10))
-        info.setStyleSheet("background: #f0f0f0; padding: 10px; border-radius: 5px;")
-        right_layout.addWidget(info)
-
-        main_layout.addLayout(left_layout, 2)
-        main_layout.addLayout(right_layout, 1)
-        main_widget.setLayout(main_layout)
-
-        # Connect button clicks
-        for (row, col), btn in self.buttons.items():
-            btn.pressed.connect(lambda r=row, c=col: self.play_sound(r, c))
-
-    def keyPressEvent(self, event):
-        """Handle keyboard input"""
-        if event.key() in self.KEY_MAP:
-            row, col = self.KEY_MAP[event.key()]
-            self.buttons[(row, col)].setDown(True)
-            self.play_sound(row, col)
-
-    def keyReleaseEvent(self, event):
-        """Handle key release"""
-        if event.key() in self.KEY_MAP:
-            row, col = self.KEY_MAP[event.key()]
-            self.buttons[(row, col)].setDown(False)
-
-    def play_sound(self, row, col):
-        """Play sound from button"""
-        sound = self.sounds[(row, col)]
-        pygame.mixer.find_channel().play(sound)
-
-    def toggle_recording(self):
-        """Toggle recording on/off"""
+    def toggle_rec(self):
         if self.recording:
             self.recording = False
-            filename = self.synth.stop_recording()
-            self.record_btn.setText("⏺️ Start Recording")
-            self.record_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #ff4444;
-                    color: white;
-                    font-weight: bold;
-                    font-size: 14px;
-                    border-radius: 8px;
-                    border: 2px solid #cc0000;
-                }
-                QPushButton:hover {
-                    background-color: #ff6666;
-                }
-            """)
-            self.record_time.setText("Recording saved!")
-            if filename:
-                QMessageBox.information(self, "✓ Saved", f"Recording saved:\n{filename}")
+            fname = self.synth.stop_recording()
+            self.rec_btn.setText("⏺️ START")
+            if fname:
+                self.rec_lbl.setText(f"✓ {fname}")
+                QMessageBox.information(self, "Saved", f"Recording: {fname}")
         else:
             self.recording = True
+            self.rec_btn.setText("⏹️ STOP")
             self.synth.start_recording()
-            self.record_btn.setText("⏹️ Stop Recording")
-            self.record_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #cc0000;
-                    color: white;
-                    font-weight: bold;
-                    font-size: 14px;
-                    border-radius: 8px;
-                    border: 2px solid #ff4444;
-                }
-            """)
-            self.record_time.setText("Recording...")
-
-    def on_waveform_changed(self, waveform):
-        """Change waveform for all synth sounds"""
-        self.synth.waveform = waveform
-        for row in range(4):
-            for col in range(4):
-                note_number = row * 4 + col
-                freq = 110 * (2 ** (note_number / 12))
-                self.sounds[(row, col)] = self.synth.generate_sound(freq, 0.5, waveform)
+            self.rec_lbl.setText("Recording...")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = SoundboardApp()
+    window = ProSoundboardApp()
     window.show()
     sys.exit(app.exec())
