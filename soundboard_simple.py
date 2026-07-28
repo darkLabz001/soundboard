@@ -6,6 +6,7 @@ Uses pygame for audio (easier to install than PyAudio)
 
 import sys
 import math
+import struct
 from collections import defaultdict
 from datetime import datetime
 import threading
@@ -90,11 +91,11 @@ class AudioSynthesizer:
 
             samples.append(int(sample * envelope * 0.8 * 32767 * self.volume))
 
-        # Convert to bytes
-        sound_data = bytes(samples)
+        # Convert to 16-bit bytes using struct
+        sound_bytes = b''.join(struct.pack('<h', max(-32768, min(32767, s))) for s in samples)
 
         # Create pygame Sound
-        sound = pygame.mixer.Sound(buffer=sound_data)
+        sound = pygame.mixer.Sound(buffer=sound_bytes)
 
         # Record if enabled
         if self.is_recording:
@@ -119,8 +120,8 @@ class AudioSynthesizer:
         if not self.recording_buffer:
             return None
 
-        # Convert to bytes
-        recording_bytes = bytes(self.recording_buffer)
+        # Convert to 16-bit bytes using struct
+        recording_bytes = b''.join(struct.pack('<h', max(-32768, min(32767, s))) for s in self.recording_buffer)
 
         # Generate filename
         filename = f"recording_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
